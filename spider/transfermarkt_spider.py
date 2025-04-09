@@ -16,13 +16,13 @@ CHROMEDRIVER_PATH = "../drivers/chromedriver.exe"  # Beispiel: Ordner "drivers" 
 # %%
 def get_table_and_match_results(season_id, spieltag):
     """
-    Ruft die Seite der Spieltagstabelle ab (z.B. Saison 24/25) und extrahiert:
+    Ruft die Seite der Spieltagstabelle ab und extrahiert:
       - Den aggregierten Tabellenbereich (die erste Tabelle mit class "items")
       - Die Rohzeilen der detaillierten Tagesresultate (im Bereich "responsive-table")
     
-    Unabhängig davon, ob der Spieltag bereits stattgefunden hat oder in der Zukunft liegt,
-    werden die Daten zurückgegeben. Für zukünftige Spieltage (Datum > heute) wird ein Flag
-    "future" (True) gesetzt, das du später in der Simulation verwenden kannst.
+    Es wird das Datum aus Links extrahiert.
+    Für zukünftige Spieltage wird ein Flag future_flag gesetzt, 
+    und in der aggregierten Tabelle werden Ergebnisfelder geleert.
     """
     url = f"https://www.transfermarkt.ch/super-league/spieltagtabelle/wettbewerb/C1?saison_id={season_id}&spieltag={spieltag}"
     
@@ -40,7 +40,7 @@ def get_table_and_match_results(season_id, spieltag):
     soup = BeautifulSoup(driver.page_source, "html.parser")
     driver.quit()
     
-    # Prüfe Datum: Suche in Links nach einem Datum im Format dd.mm.yyyy
+    # Datum aus Links extrahieren (Format: dd.mm.yyyy)
     date_pattern = re.compile(r'\d{2}\.\d{2}\.\d{4}')
     match_date = None
     for a in soup.find_all("a", href=True):
@@ -73,7 +73,12 @@ def get_table_and_match_results(season_id, spieltag):
             for row in rows:
                 parsed = parse_league_row(row)
                 if parsed:
-                    # Füge Season, Spieltag und Zukunfts-Flag vorne ein
+                    # Falls es sich um einen zukünftigen Spieltag handelt, setzen wir Ergebniswerte auf ""
+                    if future_flag:
+                        parsed[6] = ""  # Tore
+                        parsed[7] = ""  # Goal_Diff
+                        parsed[8] = ""  # Points
+                    # Füge Season, Spieltag und future_flag vorne ein
                     parsed.insert(0, future_flag)
                     parsed.insert(0, spieltag)
                     parsed.insert(0, season_id)
@@ -89,7 +94,6 @@ def get_table_and_match_results(season_id, spieltag):
         if table2:
             tbody2 = table2.find("tbody")
             if tbody2:
-                # Sammle alle TRs – Header und Spielzeilen
                 match_rows = tbody2.find_all("tr")
     else:
         print("Keine detaillierten Tagesresultate gefunden!")
@@ -99,8 +103,7 @@ def get_table_and_match_results(season_id, spieltag):
 def parse_league_row(row):
     """
     Extrahiert aus einer Zeile der aggregierten Tabelle:
-      - Rank (erste Zelle), Team (dritte Zelle – Linktext)
-      - Danach: Spiele, G, U, V, Tore, Goal_Diff, Points
+      - Rank, Team, Spiele, G, U, V, Tore, Goal_Diff, Points.
     Erwartet mindestens 10 TD-Elemente.
     """
     cells = row.find_all("td")
@@ -120,9 +123,11 @@ def parse_league_row(row):
 def parse_detailed_matches(match_rows):
     """
     Iteriert über die TR-Elemente der detaillierten Tabelle.
-    Header-Zeilen (mit Klasse "bg_blau_20") enthalten Datum und Uhrzeit und setzen den Kontext.
-    Reguläre Spielzeilen werden verarbeitet; falls kein Ergebnis vorliegt (zukünftige Spiele),
-    werden home_goals und away_goals als None gesetzt.
+    Header-Zeilen (mit Klasse "bg_blau_20") enthalten Datum und Uhrzeit.
+    Für Spielzeilen:
+      - Wird das Ergebnis (Zelle 6) extrahiert, wenn es im Format "x:y" erscheint.
+      - Zusätzlich wird geprüft: Liegt das aktuell gesetzte Datum (current_date) in der Zukunft?
+        In diesem Fall setzen wir home_goals und away_goals auf None.
     """
     matches = []
     current_date = ""
@@ -143,21 +148,30 @@ def parse_detailed_matches(match_rows):
         cells = row.find_all("td")
         if len(cells) < 11:
             continue
+        # Ergebnis aus Zelle 6
         result_text = cells[6].get_text(strip=True)
-        if re.match(r'\d+:\d+', result_text):
+        # Prüfe, ob current_date in der Zukunft liegt:
+        result_available = True
+        if current_date:
+            try:
+                header_date = datetime.strptime(current_date, "%d.%m.%Y")
+                if header_date > datetime.today():
+                    result_available = False
+            except Exception:
+                pass
+        if result_available and re.match(r'\d+:\d+', result_text):
             try:
                 home_goals, away_goals = map(int, result_text.split(":"))
             except Exception:
-                home_goals, away_goals = None, None
+                home_goals, away_goals = -1, -1
         else:
-            # Für zukünftige Spiele, bei denen noch kein Ergebnis vorliegt
-            home_goals, away_goals = None, None
+            home_goals, away_goals = -1, -1
         
         home_info = cells[3].get_text(strip=True)
         home_rank_match = rank_pattern.search(home_info)
         home_rank = int(home_rank_match.group(1)) if home_rank_match else None
         home_team = rank_pattern.sub("", home_info).strip()
-
+        
         away_info = cells[8].get_text(strip=True)
         away_rank_match = rank_pattern.search(away_info)
         away_rank = int(away_rank_match.group(1)) if away_rank_match else None
@@ -195,7 +209,7 @@ def get_all_data(seasons, start_day, end_day):
     return league_all, matches_all
 
 # Beispiel: Alle Spieltage der Saisons 24/25 und 23/24 (Spieltag 1 bis 38)
-league_all_data, matches_all_data = get_all_data([2024, 2023], 1, 38)
+league_all_data, matches_all_data = get_all_data([2023 , 2024], 1, 38)
 
 # Erstelle DataFrames
 league_columns = ["Season", "Spieltag", "Future", "Rank", "Team", "Spiele", "G", "U", "V", "Tore", "Goal_Diff", "Points"]
