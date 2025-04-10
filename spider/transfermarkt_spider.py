@@ -1,7 +1,12 @@
-# %%
-# Falls noch nicht installiert:
-# !pip install selenium beautifulsoup4 pandas
-
+# %% 
+"""
+Notwendige Importe und Initialisierung
+----------------------------------------
+- Import von Standardmodulen (re, time, datetime)
+- Import von pandas zur Datenmanipulation
+- Import von Selenium (webdriver und Service) und BeautifulSoup zur HTML-Extraktion
+- MongoClient aus pymongo zur Verbindung mit der Datenbank
+"""
 import re
 import time
 import pandas as pd
@@ -9,23 +14,36 @@ from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
+from pymongo import MongoClient
 
-# Passe den Pfad zu deinem ChromeDriver an
-CHROMEDRIVER_PATH = "../drivers/chromedriver.exe"  # Beispiel: Ordner "drivers" im Projektverzeichnis
+# MongoDB-Verbindung aufbauen
+client = MongoClient("mongodb://localhost:27017/")
+db = client["mdm-project1"]
+
+# Pfad zum ChromeDriver (Anpassung nach Bedarf)
+CHROMEDRIVER_PATH = "../drivers/chromedriver.exe"
 
 # %%
 def get_table_and_match_results(season_id, spieltag):
     """
-    Ruft die Seite der Spieltagstabelle ab und extrahiert:
-      - Den aggregierten Tabellenbereich (die erste Tabelle mit class "items")
-      - Die Rohzeilen der detaillierten Tagesresultate (im Bereich "responsive-table")
+    Extrahiert die aggregierte Liga-Tabelle und die detaillierten Tagesresultate
+    für einen gegebenen Spieltag einer Saison von Transfermarkt.
     
-    Es wird das Datum aus Links extrahiert.
-    Für zukünftige Spieltage wird ein Flag future_flag gesetzt, 
-    und in der aggregierten Tabelle werden Ergebnisfelder geleert.
+    Parameter:
+        season_id (int): Die Saison-ID (z.B. 2024).
+        spieltag (int): Die Spieltag-Nummer.
+    
+    Returns:
+        league_table (list): Liste von Einträgen aus der aggregierten Tabelle. Jeder Eintrag enthält:
+             [season_id, spieltag, future_flag, Rank, Team, Spiele, G, U, V, Tore, Goal_Diff, Points]
+             Für zukünftige Spieltage (future_flag True) werden Tore, Goal_Diff und Points als leere Strings
+             bzw. im späteren Preprocessing als -1 abgelegt.
+        match_rows (list): Liste von Rohdatenzeilen (TR-Elemente) aus dem detaillierten Resultatbereich.
     """
+    # Erstelle die URL anhand der Saison und des Spieltags
     url = f"https://www.transfermarkt.ch/super-league/spieltagtabelle/wettbewerb/C1?saison_id={season_id}&spieltag={spieltag}"
     
+    # Selenium-Konfiguration
     service = Service(CHROMEDRIVER_PATH)
     options = webdriver.ChromeOptions()
     options.add_argument("--headless")
@@ -36,11 +54,11 @@ def get_table_and_match_results(season_id, spieltag):
     
     driver = webdriver.Chrome(service=service, options=options)
     driver.get(url)
-    time.sleep(5)  # Warte, bis alle Inhalte geladen sind
+    time.sleep(5)  # Wartezeit, bis alle Inhalte geladen sind
     soup = BeautifulSoup(driver.page_source, "html.parser")
     driver.quit()
     
-    # Datum aus Links extrahieren (Format: dd.mm.yyyy)
+    # Extrahiere Datum aus Link-Elementen (Format dd.mm.yyyy)
     date_pattern = re.compile(r'\d{2}\.\d{2}\.\d{4}')
     match_date = None
     for a in soup.find_all("a", href=True):
@@ -63,7 +81,7 @@ def get_table_and_match_results(season_id, spieltag):
     else:
         print("Kein Datum gefunden.")
     
-    # Aggregierte Tabelle extrahieren
+    # Aggregierte Liga-Tabelle extrahieren
     league_table = []
     table = soup.find("table", class_="items")
     if table:
@@ -73,12 +91,12 @@ def get_table_and_match_results(season_id, spieltag):
             for row in rows:
                 parsed = parse_league_row(row)
                 if parsed:
-                    # Falls es sich um einen zukünftigen Spieltag handelt, setzen wir Ergebniswerte auf ""
                     if future_flag:
+                        # Für zukünftige Spieltage Ergebnisfelder leeren; diese werden später z.B. mit -1 ersetzt.
                         parsed[6] = ""  # Tore
                         parsed[7] = ""  # Goal_Diff
                         parsed[8] = ""  # Points
-                    # Füge Season, Spieltag und future_flag vorne ein
+                    # Füge season_id, spieltag und das future_flag als erstes ein
                     parsed.insert(0, future_flag)
                     parsed.insert(0, spieltag)
                     parsed.insert(0, season_id)
@@ -86,7 +104,7 @@ def get_table_and_match_results(season_id, spieltag):
     else:
         print("Keine aggregierte Tabelle mit class 'items' gefunden!")
     
-    # Detaillierte Tagesresultate extrahieren
+    # Extrahiere detaillierte Tagesresultate
     match_rows = []
     responsive_div = soup.find("div", class_="responsive-table")
     if responsive_div:
@@ -102,9 +120,11 @@ def get_table_and_match_results(season_id, spieltag):
 
 def parse_league_row(row):
     """
-    Extrahiert aus einer Zeile der aggregierten Tabelle:
+    Parst eine Zeile der aggregierten Tabelle und extrahiert:
       - Rank, Team, Spiele, G, U, V, Tore, Goal_Diff, Points.
-    Erwartet mindestens 10 TD-Elemente.
+    
+    Gibt eine Liste zurück, sofern die Zeile ausreichend Daten (mindestens 10 Zellen) enthält,
+    ansonsten None.
     """
     cells = row.find_all("td")
     if len(cells) < 10:
@@ -122,12 +142,12 @@ def parse_league_row(row):
 
 def parse_detailed_matches(match_rows):
     """
-    Iteriert über die TR-Elemente der detaillierten Tabelle.
-    Header-Zeilen (mit Klasse "bg_blau_20") enthalten Datum und Uhrzeit.
-    Für Spielzeilen:
-      - Wird das Ergebnis (Zelle 6) extrahiert, wenn es im Format "x:y" erscheint.
-      - Zusätzlich wird geprüft: Liegt das aktuell gesetzte Datum (current_date) in der Zukunft?
-        In diesem Fall setzen wir home_goals und away_goals auf None.
+    Parst detaillierte Zeilen einer Spieltagstabelle.
+    
+    Header-Zeilen (Klasse "bg_blau_20") enthalten Datum und Uhrzeit, die als Kontext
+    für nachfolgende Spielzeilen verwendet werden. Für Spielzeilen wird das Ergebnis
+    extrahiert, sofern im Format "x:y". Liegt das Datum in der Zukunft, werden die
+    Tore als -1 gesetzt (als Platzhalter für noch nicht gespielte Matches).
     """
     matches = []
     current_date = ""
@@ -148,9 +168,9 @@ def parse_detailed_matches(match_rows):
         cells = row.find_all("td")
         if len(cells) < 11:
             continue
-        # Ergebnis aus Zelle 6
+        
         result_text = cells[6].get_text(strip=True)
-        # Prüfe, ob current_date in der Zukunft liegt:
+        # Überprüfe, ob das aktuelle Datum in der Zukunft liegt und setze Ergebnis gegebenenfalls auf -1
         result_available = True
         if current_date:
             try:
@@ -191,6 +211,11 @@ def parse_detailed_matches(match_rows):
     return matches
 
 def get_all_data(seasons, start_day, end_day):
+    """
+    Iteriert über alle angegebenen Spieltage für die vorgegebenen Saisons.
+    Extrahiert sowohl die aggregierte Liga-Tabelle als auch die detaillierten Spielresultate.
+    Fügt für jeden Datensatz Season und Spieltag hinzu.
+    """
     league_all = []
     matches_all = []
     for season in seasons:
@@ -208,16 +233,42 @@ def get_all_data(seasons, start_day, end_day):
                 matches_all.append(match)
     return league_all, matches_all
 
-# Beispiel: Alle Spieltage der Saisons 24/25 und 23/24 (Spieltag 1 bis 38)
+# %% 
+# Hauptprogramm – Sammle Daten für einen bestimmten Zeitraum (hier z. B. Spieltag 30 bis 33 der Saison 2024)
 league_all_data, matches_all_data = get_all_data([2023 , 2024], 1, 38)
 
-# Erstelle DataFrames
+# Erstelle DataFrames für die aggregierte Tabelle und die detaillierten Ergebnisse
 league_columns = ["Season", "Spieltag", "Future", "Rank", "Team", "Spiele", "G", "U", "V", "Tore", "Goal_Diff", "Points"]
 df_league_table = pd.DataFrame(league_all_data, columns=league_columns)
 
 match_columns = ["Season", "Spieltag", "date", "time", "home_rank", "home_team", "home_goals", "away_goals", "away_rank", "away_team"]
 df_matches = pd.DataFrame(matches_all_data, columns=match_columns)
 
-# Exportiere die Ergebnisse
+# %% 
+# Upsert in MongoDB: Aktualisiert vorhandene Einträge oder fügt neue hinzu basierend auf einem eindeutigen Schlüssel.
+def upsert_records(collection, records, key_fields):
+    for record in records:
+        filter_query = {field: record[field] for field in key_fields}
+        collection.update_one(filter_query, {"$set": record}, upsert=True)
+
+# Wandle DataFrames in Listen von Dictionaries um
+league_records = df_league_table.to_dict(orient="records")
+matches_records = df_matches.to_dict(orient="records")
+
+# Definiere eindeutige Schlüssel für den Delta-Import
+league_key_fields = ["Season", "Spieltag", "Team"]
+matches_key_fields = ["Season", "Spieltag", "date", "time", "home_team", "away_team"]
+
+# Collections auswählen
+league_collection = db["league-tables"]
+matches_collection = db["matches"]
+
+# Führe den Upsert durch
+upsert_records(league_collection, league_records, league_key_fields)
+upsert_records(matches_collection, matches_records, matches_key_fields)
+
+print("Delta-Import: Daten wurden erfolgreich in MongoDB aktualisiert bzw. eingefügt.")
+
+# Exportiere die Ergebnisse auch lokal als CSV
 df_matches.to_csv("../data/df_matches_raw.csv", index=False)
 df_league_table.to_csv("../data/df_league_table_raw.csv", index=False)

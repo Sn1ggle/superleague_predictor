@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Abstiegs-Predicter</title>
-    <link rel="stylesheet" href="../static/styles.css">
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <h1>Abstiegs-Predicter</h1>
@@ -16,13 +16,27 @@
         </select>
         <button type="submit">Vorhersage erhalten</button>
     </form>
+
     {% if prediction %}
         <h2>Vorhersage:</h2>
         <p>{{ prediction }}</p>
     {% endif %}
+    
     {% if error_message %}
         <h2>Fehler:</h2>
         <p>{{ error_message }}</p>
+    {% endif %}
+    
+    {% if info %}
+    <div class="info-panel">
+        <h3>Weitere Informationen zum aktuellen Stand:</h3>
+        <ul>
+            <li><strong>Aktuelle Punkte:</strong> {{ info.Points }}</li>
+            <li><strong>Aktueller Rang:</strong> {{ info.Rank }}</li>
+            <li><strong>Verbleibende Spiele:</strong> {{ info.Restspiele }}</li>
+            <li><strong>Geschätzte zusätzliche Punkte:</strong> {{ info.Estimated_Extra_Points }}</li>
+        </ul>
+    </div>
     {% endif %}
 </body>
 </html>
