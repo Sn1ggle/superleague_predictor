@@ -7,6 +7,7 @@ Notwendige Importe und Initialisierung
 - Import von Selenium (webdriver und Service) und BeautifulSoup zur HTML-Extraktion
 - MongoClient aus pymongo zur Verbindung mit der Datenbank
 """
+import os
 import re
 import time
 import pandas as pd
@@ -16,8 +17,12 @@ from selenium.webdriver.chrome.service import Service
 from bs4 import BeautifulSoup
 from pymongo import MongoClient
 
+mongodb_uri = os.getenv("MONGODB_URI")
+if not mongodb_uri:
+    raise ValueError("Die Umgebungsvariable MONGODB_URI ist nicht gesetzt!")
+
 # MongoDB-Verbindung aufbauen
-client = MongoClient("mongodb://localhost:27017/")
+client = MongoClient(mongodb_uri)
 db = client["mdm-project1"]
 
 # Pfad zum ChromeDriver (Anpassung nach Bedarf)
