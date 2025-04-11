@@ -1,41 +1,66 @@
-# backend/__init__.py
-
 import os
 import joblib
-from flask import Flask, render_template, request
+from flask import Flask, render_template, request, jsonify, send_file
 import pandas as pd
 from pymongo import MongoClient
 from azure.storage.blob import BlobServiceClient
 
-def download_model():
-    """Lädt das aktuellste Modell aus Azure Blob Storage herunter und speichert es lokal."""
+def download_file_from_blob(container_name, blob_pattern, local_filename):
+    """
+    Lädt eine Datei aus dem angegebenen Blob-Container herunter, 
+    deren Name dem übergebenen Muster (blob_pattern) entspricht, und speichert sie lokal.
+    """
     connection_str = os.getenv("AZURE_STORAGE_CONNECTION_STRING")
     if not connection_str:
         raise ValueError("AZURE_STORAGE_CONNECTION_STRING ist nicht gesetzt!")
+    
     blob_service_client = BlobServiceClient.from_connection_string(connection_str)
-    container_client = blob_service_client.get_container_client("models")
-    # Annahme: Die Blobnamen folgen dem Muster "model-<version>.pkl"
-    blobs = list(container_client.list_blobs(name_starts_with="model-"))
+    container_client = blob_service_client.get_container_client(container_name)
+    blobs = list(container_client.list_blobs(name_starts_with=blob_pattern))
     if not blobs:
-        raise FileNotFoundError("Keine Modell-Datei im Blob Storage gefunden!")
-    latest_blob = sorted(blobs, key=lambda b: int(b.name.split("-")[-1].replace(".pkl", "")))[-1]
-    local_model_path = "best_model.pkl"
-    with open(local_model_path, "wb") as f:
+        raise FileNotFoundError(f"Keine Datei gefunden, die mit '{blob_pattern}' beginnt!")
+    
+    # Sortieren nach Versionsnummer (angenommen, die Version steht am Ende des Blob-Namens)
+    latest_blob = sorted(
+        blobs, key=lambda b: int(b.name.split("-")[-1].replace(".pkl", ""))
+    )[-1]
+    local_path = os.path.join("..", "model", local_filename)
+    # Sicherstellen, dass das Verzeichnis existiert
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    with open(local_path, "wb") as f:
         f.write(container_client.download_blob(latest_blob.name).readall())
-    return local_model_path
+    return local_path
+
+def download_model_and_scaler():
+    """
+    Lädt sowohl das aktuellste Modell als auch den Skalierer aus dem Blob Storage herunter
+    und gibt die lokalen Pfade zurück.
+    """
+    container_name = "models"  # Containername, wie im save.py verwendet
+    model_path = download_file_from_blob(container_name, "model-", "model.pkl")
+    scaler_path = download_file_from_blob(container_name, "scaler-", "scaler.pkl")
+    return model_path, scaler_path
 
 def create_app():
+    """
+    Initialisiert die Flask-Anwendung:
+      - Stellt die Verbindung zu MongoDB her und lädt die Liga-Daten.
+      - Lädt das aktuellste ML-Modell sowie den Skalierer aus Azure Blob Storage.
+      - Definiert Routen für den Haupt-Endpunkt ("/") und Vorhersagen ("/predict").
+    """
     app = Flask(__name__, template_folder="../frontend/templates", static_folder="../frontend/static")
 
-    # MongoDB-Verbindung über Umgebungsvariable
+    # MongoDB-Verbindung via Umgebungsvariable
     mongodb_uri = os.getenv("MONGODB_URI")
     if not mongodb_uri:
         raise ValueError("MONGODB_URI nicht gesetzt!")
     client = MongoClient(mongodb_uri)
     db = client["mdm-project1"]
 
-    # Laden Sie Liga-Daten aus MongoDB (Implementierung analog zu vorher)
     def load_league_data():
+        """
+        Lädt Liga-Daten aus der "league-tables"-Collection in MongoDB und bereitet den DataFrame vor.
+        """
         cursor = db["league-tables"].find()
         df = pd.DataFrame(list(cursor))
         if '_id' in df.columns:
@@ -53,10 +78,10 @@ def create_app():
     league_df = load_league_data()
     teams = league_df['Team'].unique().tolist()
 
-    # Laden Sie das Modell: Zuerst Modell aus Blob herunterladen, dann laden
-    model_path = download_model()
+    # Laden von Modell und Skalierer aus Azure Blob Storage
+    model_path, scaler_path = download_model_and_scaler()
     model = joblib.load(model_path)
-    scaler = joblib.load("scaler.pkl")  # Angenommen, Ihr Skalierer wurde lokal persistiert
+    scaler = joblib.load(scaler_path)
     features = ['Points', 'Goal_Diff', 'G', 'U', 'V', 'Restspiele', 'Estimated_Extra_Points']
 
     @app.route("/")
@@ -89,3 +114,7 @@ def create_app():
         return render_template("index.html", teams=teams, prediction=prediction, error_message=error_message, details=details)
 
     return app
+
+if __name__ == "__main__":
+    app = create_app()
+    app.run(debug=True, host="0.0.0.0", port=5000)
