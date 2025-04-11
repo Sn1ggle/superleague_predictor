@@ -14,6 +14,10 @@ attrs==25.3.0
     #   twisted
 automat==24.8.1
     # via twisted
+azure-core==1.33.0
+    # via azure-storage-blob
+azure-storage-blob==12.24.0
+    # via -r requirements.in
 beautifulsoup4==4.13.3
     # via
     #   -r requirements.in
@@ -44,6 +48,7 @@ contourpy==1.3.1
     # via matplotlib
 cryptography==44.0.2
     # via
+    #   azure-storage-blob
     #   pyopenssl
     #   scrapy
     #   service-identity
@@ -78,6 +83,8 @@ idna==3.10
     #   trio
 incremental==24.7.2
     # via twisted
+isodate==0.7.2
+    # via azure-storage-blob
 itemadapter==0.11.0
     # via
     #   itemloaders
@@ -178,6 +185,7 @@ queuelib==1.8.0
 requests==2.31.0
     # via
     #   -r requirements.in
+    #   azure-core
     #   requests-file
     #   requests-html
     #   tldextract
@@ -198,7 +206,9 @@ selenium==4.12.0
 service-identity==24.2.0
     # via scrapy
 six==1.17.0
-    # via python-dateutil
+    # via
+    #   azure-core
+    #   python-dateutil
 sniffio==1.3.1
     # via trio
 sortedcontainers==2.4.0
@@ -221,6 +231,8 @@ twisted==24.11.0
     # via scrapy
 typing-extensions==4.13.0
     # via
+    #   azure-core
+    #   azure-storage-blob
     #   beautifulsoup4
     #   pyee
     #   twisted
