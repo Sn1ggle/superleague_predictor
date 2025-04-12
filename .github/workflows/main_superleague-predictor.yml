@@ -32,7 +32,7 @@ jobs:
 
       - name: Build container image with Docker Compose
         run: |
-          docker-compose build
+          docker compose build
           # Hier wird der Service "superleague_prognose" getaggt
           docker tag superleague_prognose:latest ghcr.io/${{ env.REPO }}:${{ github.sha }}
           docker push ghcr.io/${{ env.REPO }}:${{ github.sha }}
