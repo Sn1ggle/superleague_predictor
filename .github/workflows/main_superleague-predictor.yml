@@ -1,6 +1,9 @@
 name: ModelOps (Build, Deploy)
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
   workflow_run:
     workflows: ["ModelOps (Update Model)"]
@@ -33,7 +36,7 @@ jobs:
       - name: Build container image with Docker Compose
         run: |
           docker compose build
-          # Hier wird der Service "superleague_prognose" getaggt
+          # Der Dienst in docker-compose heißt "superleague_prognose"
           docker tag superleague_prognose:latest ghcr.io/${{ env.REPO }}:${{ github.sha }}
           docker push ghcr.io/${{ env.REPO }}:${{ github.sha }}
 
@@ -51,6 +54,6 @@ jobs:
         id: deploy-to-webapp
         uses: azure/webapps-deploy@v2
         with:
-          app-name: ${{ env.AZURE_WEBAPP_NAME }}       # Dieses Secret (Name Ihrer Azure Web App) muss definiert sein.
-          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}  # Ihr Publish Profile, wie von Azure bereitgestellt.
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
           images: ghcr.io/${{ env.REPO }}:${{ github.sha }}
