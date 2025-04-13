@@ -10,6 +10,10 @@ jobs:
   update_model:
     runs-on: ubuntu-latest
 
+    env:
+      MONGODB_URI: ${{ secrets.MONGODB_URI }}
+      AZURE_STORAGE_CONNECTION_STRING: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
+
     steps:
       # 1. Repository-Checkout
       - name: Checkout repository
