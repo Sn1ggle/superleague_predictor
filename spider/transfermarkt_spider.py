@@ -275,5 +275,5 @@ upsert_records(matches_collection, matches_records, matches_key_fields)
 print("Delta-Import: Daten wurden erfolgreich in MongoDB aktualisiert bzw. eingefügt.")
 
 # Exportiere die Ergebnisse auch lokal als CSV
-df_matches.to_csv("../data/df_matches_raw.csv", index=False)
-df_league_table.to_csv("../data/df_league_table_raw.csv", index=False)
+#df_matches.to_csv("../data/df_matches_raw.csv", index=False)
+#df_league_table.to_csv("../data/df_league_table_raw.csv", index=False)
