@@ -19,6 +19,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Set up Chrome
+        uses: browser-actions/setup-chrome@v1
+        id: setup-chrome
+        with:
+          chrome-version: 135
+          install-chromedriver: true
+
+      - name: Set up ChromeDriver Path
+        run: echo "CHROMEDRIVER_PATH=${{ steps.setup-chrome.outputs.chromedriver-path }}" >> $GITHUB_ENV
+
       # 2. Python-Umgebung aufsetzen
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -32,7 +42,6 @@ jobs:
           source venv/bin/activate
           pip install --upgrade pip
           pip install --no-cache-dir -r requirements.txt
-          sudo apt-get install -y chromium-browser
 
       # 4. Scraper ausführen – aktualisiert die Daten (z. B. importiert neue Spiele in die MongoDB)
       - name: Run Scraper to update data

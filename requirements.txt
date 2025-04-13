@@ -28,6 +28,7 @@ bs4==0.0.2
     # via requests-html
 certifi==2025.1.31
     # via
+    #   pyppeteer
     #   requests
     #   selenium
 cffi==1.17.1
@@ -81,6 +82,8 @@ idna==3.10
     #   requests
     #   tldextract
     #   trio
+importlib-metadata==8.6.1
+    # via pyppeteer
 incremental==24.7.2
     # via twisted
 isodate==0.7.2
@@ -160,7 +163,7 @@ pycparser==2.22
     # via cffi
 pydispatcher==2.0.7
     # via scrapy
-pyee==13.0.0
+pyee==11.1.1
     # via pyppeteer
 pymongo==4.10.1
     # via -r .\requirements.in
@@ -168,8 +171,10 @@ pyopenssl==25.0.0
     # via scrapy
 pyparsing==3.2.3
     # via matplotlib
-pyppeteer==0.0.25
-    # via requests-html
+pyppeteer==2.0.0
+    # via
+    #   -r .\requirements.in
+    #   requests-html
 pyquery==2.0.1
     # via requests-html
 pysocks==1.7.1
@@ -238,7 +243,7 @@ typing-extensions==4.13.0
     #   twisted
 tzdata==2025.2
     # via pandas
-urllib3[socks]==2.3.0
+urllib3[socks]==1.26.20
     # via
     #   pyppeteer
     #   requests
@@ -256,6 +261,8 @@ werkzeug==3.1.3
     # via flask
 wsproto==1.2.0
     # via trio-websocket
+zipp==3.21.0
+    # via importlib-metadata
 zope-interface==7.2
     # via
     #   scrapy

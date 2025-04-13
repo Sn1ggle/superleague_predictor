@@ -26,7 +26,7 @@ client = MongoClient(mongodb_uri)
 db = client["mdm-project1"]
 
 # Pfad zum ChromeDriver (Anpassung nach Bedarf)
-CHROMEDRIVER_PATH = "../drivers/chromedriver.exe"
+CHROMEDRIVER_PATH = os.getenv("CHROMEDRIVER_PATH")
 
 # %%
 def get_table_and_match_results(season_id, spieltag):
