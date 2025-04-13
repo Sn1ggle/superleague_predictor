@@ -268,6 +268,10 @@ matches_key_fields = ["Season", "Spieltag", "date", "time", "home_team", "away_t
 league_collection = db["league-tables"]
 matches_collection = db["matches"]
 
+# Clear Collections (optional)
+#league_collection.delete_many({})
+#matches_collection.delete_many({})
+
 # Führe den Upsert durch
 upsert_records(league_collection, league_records, league_key_fields)
 upsert_records(matches_collection, matches_records, matches_key_fields)
