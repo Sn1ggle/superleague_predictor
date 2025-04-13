@@ -35,6 +35,7 @@ Mehrere Modelle (Logistische Regression, Random Forest, SVC) werden trainiert un
      - Führt den Webscraper aus, aktualisiert Daten in der MongoDB, trainiert das Modell neu und lädt Modell sowie Skalierer in Azure Blob Storage hoch.
 
 ## Projektstruktur
+```
 superleague_prognose/
 ├── .github/
 │   └── workflows/
@@ -60,3 +61,4 @@ superleague_prognose/
 ├── requirements.in                       # List of Python dependencies for the project (input file for pip-compile)
 ├── requirements.txt                      # List of all Python dependencies
 └── README.md                             # Projektbeschreibung und Dokumentation
+```
