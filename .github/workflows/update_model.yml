@@ -1,0 +1,48 @@
+name: ModelOps (Update Model)
+
+# Trigger: Dieser Workflow wird täglich um 01:00 UTC (cron) sowie manuell (workflow_dispatch) gestartet.
+on:
+  schedule:
+    - cron: '0 1 * * *'  # Täglich um 01:00 UTC
+  workflow_dispatch:
+
+jobs:
+  update_model:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. Repository-Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2. Python-Umgebung aufsetzen
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # 3. Virtuelle Umgebung erstellen und Abhängigkeiten installieren
+      - name: Install dependencies
+        run: |
+          python -m venv venv
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install --no-cache-dir -r requirements.txt
+
+      # 4. Scraper ausführen – aktualisiert die Daten (z. B. importiert neue Spiele in die MongoDB)
+      - name: Run Scraper to update data
+        run: |
+          source venv/bin/activate
+          python ./spider/transfermarkt_spider.py
+
+      # 5. Modell neu bauen – verwendet die aktualisierten Daten und trainiert ein neues Modell
+      - name: Run Model Builder to retrain model
+        run: |
+          source venv/bin/activate
+          python ./model/model_generator.py
+
+      # 6. Save Script ausführen – lädt Modell und Skalierer in Azure Blob Storage hoch
+      - name: Run Save Script to upload new model and scaler
+        run: |
+          source venv/bin/activate
+          python ./model/save.py
